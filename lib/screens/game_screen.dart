@@ -40,7 +40,10 @@ class _GameScreenState extends State<GameScreen> {
   List<Obstacle> _obstacles = [];
   final Random _random = Random();
   double _obstacleSpawnTimer = 0.0;
-  final double _obstacleSpawnInterval = 2.0;
+  double _nextSpawnInterval = 0.0; // Dynamic random interval
+  // Spawn interval range - calculated to ensure safe gaps
+  final double _minSpawnInterval = 1.5; // Minimum time between obstacles (seconds)
+  final double _maxSpawnInterval = 4.0; // Maximum time between obstacles (seconds)
   
   // Track height and position
   final double _trackHeight = 60.0; // Thinner track
@@ -121,6 +124,7 @@ class _GameScreenState extends State<GameScreen> {
       _isGrounded = true;
       _obstacles.clear();
       _obstacleSpawnTimer = 0.0;
+      _nextSpawnInterval = _getRandomSpawnInterval(); // Initialize first spawn interval
       
       // Reset speed scaling system
       _currentSpeed = _baseSpeed;
@@ -132,6 +136,42 @@ class _GameScreenState extends State<GameScreen> {
         _updateGame();
       }
     });
+  }
+
+  /// Calculate a random spawn interval that ensures safe gaps between obstacles
+  /// Takes into account current game speed to prevent obstacles from being too close
+  double _getRandomSpawnInterval() {
+    // Calculate minimum safe gap based on current speed
+    // Jump duration: time to go up + time to come down
+    // Up time = jumpForce / gravity, Down time = same (symmetric)
+    final double jumpUpTime = _jumpForce / _g; // frames
+    final double totalJumpTime = jumpUpTime * 2; // total jump duration in frames
+    final double jumpTimeSeconds = totalJumpTime * 0.016; // Convert to seconds (60fps)
+    
+    // Distance obstacle travels during a jump
+    // Obstacle width + distance traveled during jump + safety margin
+    const double obstacleWidth = 60.0;
+    final double distanceDuringJump = _currentSpeed * jumpTimeSeconds;
+    const double safetyMargin = 100.0; // Extra safety margin in pixels
+    final double minGapDistance = obstacleWidth + distanceDuringJump + safetyMargin;
+    
+    // Convert gap distance to time (seconds)
+    // At current speed, how long does it take to travel minGapDistance?
+    final double minTimeForGap = minGapDistance / _currentSpeed;
+    
+    // Ensure minimum spawn interval accounts for safe gap
+    // Use the larger of: calculated safe gap or base minimum interval
+    final double effectiveMinInterval = minTimeForGap > _minSpawnInterval 
+        ? minTimeForGap 
+        : _minSpawnInterval;
+    
+    // Generate random interval between effective minimum and maximum
+    // Add some randomness for variety while maintaining safety
+    final double randomFactor = _random.nextDouble(); // 0.0 to 1.0
+    final double intervalRange = _maxSpawnInterval - effectiveMinInterval;
+    final double randomInterval = effectiveMinInterval + (randomFactor * intervalRange);
+    
+    return randomInterval;
   }
 
   void _updateGame() {
@@ -181,9 +221,31 @@ class _GameScreenState extends State<GameScreen> {
     
     // Update obstacles using current speed (increases over time)
     _obstacleSpawnTimer += frameTime;
-    if (_obstacleSpawnTimer >= _obstacleSpawnInterval) {
-      _obstacleSpawnTimer = 0.0;
-      _obstacles.add(Obstacle.generateRandom(_screenWidth));
+    if (_obstacleSpawnTimer >= _nextSpawnInterval) {
+      // Safety check: ensure last obstacle is far enough away
+      bool canSpawn = true;
+      if (_obstacles.isNotEmpty) {
+        final lastObstacle = _obstacles.last;
+        // Calculate minimum safe distance
+        final double jumpUpTime = _jumpForce / _g;
+        final double totalJumpTime = jumpUpTime * 2;
+        final double jumpTimeSeconds = totalJumpTime * 0.016;
+        final double distanceDuringJump = _currentSpeed * jumpTimeSeconds;
+        const double minSafeDistance = 60.0 + distanceDuringJump + 150.0; // obstacle width + jump distance + margin
+        
+        // Check if last obstacle is still too close to spawn point
+        final double distanceFromSpawn = _screenWidth - lastObstacle.x;
+        if (distanceFromSpawn < minSafeDistance) {
+          canSpawn = false; // Wait a bit longer
+        }
+      }
+      
+      if (canSpawn) {
+        _obstacleSpawnTimer = 0.0;
+        _obstacles.add(Obstacle.generateRandom(_screenWidth));
+        // Calculate next random spawn interval, ensuring safe gap
+        _nextSpawnInterval = _getRandomSpawnInterval();
+      }
     }
     
     for (var obstacle in _obstacles) {
