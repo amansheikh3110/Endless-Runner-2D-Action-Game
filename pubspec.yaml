@@ -36,6 +36,7 @@ dependencies:
   cupertino_icons: ^1.0.8
   video_player: ^2.8.2
   shared_preferences: ^2.2.2
+  audioplayers: ^6.0.0
 
 dev_dependencies:
   flutter_test:
@@ -67,6 +68,7 @@ flutter:
     - lib/assets/obstacle_2-removebg-preview.png
     - lib/assets/obstacle_3-removebg-preview.png
     - lib/assets/app_icon.jpg
+    - lib/assets/game-over-31-179699.mp3
 
   fonts:
     - family: GreatsRacing

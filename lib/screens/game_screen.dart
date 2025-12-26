@@ -3,6 +3,7 @@ import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:video_player/video_player.dart';
+import 'package:audioplayers/audioplayers.dart';
 import '../models/obstacle.dart';
 import '../utils/score_manager.dart';
 import 'start_screen.dart';
@@ -68,6 +69,9 @@ class _GameScreenState extends State<GameScreen> {
   
   // Video player
   VideoPlayerController? _videoController;
+  
+  // Audio player for game over sound
+  final AudioPlayer _audioPlayer = AudioPlayer();
   
   // Game loop
   Timer? _gameTimer;
@@ -326,6 +330,14 @@ class _GameScreenState extends State<GameScreen> {
     
     _gameTimer?.cancel();
     
+    // Play game over sound
+    try {
+      await _audioPlayer.play(AssetSource('lib/assets/game-over-31-179699.mp3'));
+    } catch (e) {
+      // Handle error silently - game can continue without sound
+      print('Error playing game over sound: $e');
+    }
+    
     // Check for new high score
     final isNewHigh = await ScoreManager.isNewHighScore(_score);
     if (isNewHigh) {
@@ -443,6 +455,7 @@ class _GameScreenState extends State<GameScreen> {
   void dispose() {
     _gameTimer?.cancel();
     _videoController?.dispose();
+    _audioPlayer.dispose();
     SystemChrome.setPreferredOrientations([
       DeviceOrientation.portraitUp,
       DeviceOrientation.portraitDown,
